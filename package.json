@@ -1,0 +1,39 @@
+{
+  "name": "sitepulse",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "axios": "^1.16.1",
+    "cheerio": "^1.2.0",
+    "chrome-launcher": "^1.2.1",
+    "highlight.js": "^11.11.1",
+    "jspdf": "^4.2.1",
+    "lighthouse": "^11.7.1",
+    "lucide-react": "^0.525.0",
+    "markdown-it": "^14.2.0",
+    "mongoose": "^9.6.2",
+    "next": "16.2.6",
+    "openai": "^6.39.0",
+    "puppeteer": "^25.0.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.8.1",
+    "rehype-highlight": "^7.0.2",
+    "remark-gfm": "^4.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.19",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.6",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^3.4.19"
+  }
+}
