@@ -3,13 +3,12 @@ export const runtime = "nodejs";
 import { NextResponse } from "next/server";
 
 import { connectDB } from "@/lib/mongodb";
-
 import { crawlWebsite } from "@/lib/crawler";
-
 import { runLighthouse } from "@/lib/lighthouse";
 
 import Scan from "@/models/Scan";
 import Page from "@/models/Page";
+
 import { formatIssues } from "@/lib/formatIssues";
 
 function formatDuration(ms) {
@@ -24,20 +23,37 @@ function formatDuration(ms) {
 
 export async function POST(req) {
   try {
-    // START TIMER
     const scanStartTime = Date.now();
 
     await connectDB();
 
     const body = await req.json();
 
-    const { url } = body;
+    let { url } = body;
 
-    const pages = await crawlWebsite(url);
+    if (!url) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "URL is required",
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!url.startsWith("http")) {
+      url = `https://${url}`;
+    }
+
+    // Crawl website
+    let pages = await crawlWebsite(url);
 
     if (!pages.length) {
-      pages.push(url);
+      pages = [url];
     }
+
+    // Remove duplicates
+    pages = [...new Set(pages)];
 
     const createdPages = [];
 
@@ -48,22 +64,32 @@ export async function POST(req) {
 
     for (const pageUrl of pages) {
       try {
+        console.log(`Scanning: ${pageUrl}`);
+
         const result = await runLighthouse(pageUrl);
+
+        console.log("LIGHTHOUSE RESULT");
+        console.log({
+          url: pageUrl,
+          performance: result.performance,
+          seo: result.seo,
+          accessibility: result.accessibility,
+          bestPractices: result.bestPractices,
+        });
 
         const page = await Page.create({
           url: pageUrl,
 
           performance: result.performance,
-
           seo: result.seo,
-
           accessibility: result.accessibility,
-
           bestPractices: result.bestPractices,
 
           metrics: result.metrics,
 
           issues: formatIssues(result.audits),
+
+          rawAudits: result.audits,
         });
 
         createdPages.push(page);
@@ -73,19 +99,18 @@ export async function POST(req) {
         accessibility += result.accessibility;
         bestPractices += result.bestPractices;
       } catch (pageError) {
-        console.log(`Failed analyzing page: ${pageUrl}`, pageError);
+        console.error(`Failed scanning ${pageUrl}`, pageError.message);
       }
     }
 
     const totalPages = createdPages.length;
 
-    // REALTIME DURATION
-    const scanEndTime = Date.now();
-
-    const scanDuration = formatDuration(scanEndTime - scanStartTime);
+    const scanDuration = formatDuration(Date.now() - scanStartTime);
 
     const scan = await Scan.create({
       url,
+
+      status: totalPages > 0 ? "completed" : "failed",
 
       totalPages,
 
@@ -109,35 +134,41 @@ export async function POST(req) {
           totalPages > 0 ? Math.round(bestPractices / totalPages) : 0,
       },
 
-      pages: createdPages.map((p) => p._id),
+      pages: createdPages.map((page) => page._id),
 
-      // DYNAMIC DURATION
       scanDuration,
     });
 
-    for (const page of createdPages) {
-      page.scanId = scan._id;
+    await Promise.all(
+      createdPages.map((page) => {
+        page.scanId = scan._id;
 
-      await page.save();
-    }
+        return page.save();
+      }),
+    );
 
     return NextResponse.json({
       success: true,
 
       scanId: scan._id,
 
+      totalPages,
+
       scanDuration,
 
-      totalPages,
+      status: scan.status,
     });
-  } catch (err) {
-    console.log(err);
+  } catch (error) {
+    console.error(error);
 
     return NextResponse.json(
       {
         success: false,
+        message: error.message || "Scan failed",
       },
-      { status: 500 },
+      {
+        status: 500,
+      },
     );
   }
 }

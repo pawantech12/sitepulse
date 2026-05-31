@@ -10,27 +10,23 @@ import AiPageReport from "@/models/AiPageReport";
 
 import { generatePageAIReport } from "@/lib/grok";
 
-export async function POST(
-  req,
-  { params },
-) {
+export async function POST(req, { params }) {
   try {
     await connectDB();
 
     const { pageId } = await params;
 
     // EXISTING REPORT
-    const existing =
-      await AiPageReport.findOne({
-        pageId,
-      });
+    const existing = await AiPageReport.findOne({
+      pageId,
+    });
 
     if (existing) {
       return NextResponse.json(existing);
     }
 
     // PAGE
-    const page = await Page.findById(pageId);
+    const page = await Page.findById(pageId).lean();
 
     if (!page) {
       return NextResponse.json(
@@ -45,18 +41,16 @@ export async function POST(
     }
 
     // GENERATE AI REPORT
-    const aiContent =
-      await generatePageAIReport(page);
+    const aiContent = await generatePageAIReport(page);
 
     // SAVE
-    const report =
-      await AiPageReport.create({
-        pageId,
+    const report = await AiPageReport.create({
+      pageId,
 
-        content: aiContent,
+      content: aiContent,
 
-        generatedAt: new Date(),
-      });
+      generatedAt: new Date(),
+    });
 
     return NextResponse.json(report);
   } catch (error) {

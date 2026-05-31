@@ -1,43 +1,42 @@
-import { exec } from "child_process";
-
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
+import axios from "axios";
 
 export async function runLighthouse(url) {
   try {
-    // remove trailing slash duplication
-    const cleanUrl = url.replace(/\/+$/, "");
+    const apiKey = process.env.PAGESPEED_API_KEY;
 
-    const command = `npx lighthouse ${cleanUrl} --output=json --quiet --chrome-flags="--headless --no-sandbox --disable-gpu"`;
-
-
-    const { stdout } = await execAsync(command, {
-      maxBuffer: 1024 * 1024 * 10,
-      windowsHide: true,
-    });
-
-    const report = JSON.parse(stdout);
-
-    return formatReport(report);
-  } catch (error) {
-    /**
-     * IMPORTANT:
-     * Lighthouse on Windows throws EPERM temp folder errors
-     * AFTER generating valid JSON.
-     */
-
-    if (error.stdout) {
-      try {
-        const report = JSON.parse(error.stdout);
-
-        return formatReport(report);
-      } catch (e) {
-        console.log("Failed parsing Lighthouse stdout");
-      }
+    if (!apiKey) {
+      throw new Error("PAGESPEED_API_KEY is missing");
     }
 
-    console.log(error);
+    const endpoint =
+      "https://www.googleapis.com/pagespeedonline/v5/runPagespeed";
+
+    const requestUrl =
+      `${endpoint}` +
+      `?url=${encodeURIComponent(url)}` +
+      `&strategy=mobile` +
+      `&category=performance` +
+      `&category=seo` +
+      `&category=accessibility` +
+      `&category=best-practices` +
+      `&key=${apiKey}`;
+
+    const { data } = await axios.get(requestUrl, {
+      timeout: 60000,
+    });
+
+    console.log(
+      "Returned Categories:",
+      Object.keys(data.lighthouseResult.categories),
+    );
+
+    if (!data?.lighthouseResult) {
+      throw new Error("No Lighthouse result returned");
+    }
+
+    return formatReport(data.lighthouseResult);
+  } catch (error) {
+    console.error("PageSpeed Error:", error.response?.data || error.message);
 
     throw error;
   }
@@ -45,44 +44,28 @@ export async function runLighthouse(url) {
 
 function formatReport(report) {
   return {
-    performance: Math.round(
-      report.categories.performance.score * 100,
-    ),
+    performance: Math.round((report.categories.performance?.score || 0) * 100),
 
-    seo: Math.round(
-      report.categories.seo.score * 100,
-    ),
+    seo: Math.round((report.categories.seo?.score || 0) * 100),
 
     accessibility: Math.round(
-      report.categories.accessibility.score * 100,
+      (report.categories.accessibility?.score || 0) * 100,
     ),
 
     bestPractices: Math.round(
-      report.categories["best-practices"].score * 100,
+      (report.categories["best-practices"]?.score || 0) * 100,
     ),
 
     metrics: {
-      FCP:
-        report.audits["first-contentful-paint"]
-          ?.displayValue || "N/A",
+      FCP: report.audits["first-contentful-paint"]?.displayValue || "N/A",
 
-      LCP:
-        report.audits[
-          "largest-contentful-paint"
-        ]?.displayValue || "N/A",
+      LCP: report.audits["largest-contentful-paint"]?.displayValue || "N/A",
 
-      CLS:
-        report.audits[
-          "cumulative-layout-shift"
-        ]?.displayValue || "N/A",
+      CLS: report.audits["cumulative-layout-shift"]?.displayValue || "N/A",
 
-      TBT:
-        report.audits["total-blocking-time"]
-          ?.displayValue || "N/A",
+      TBT: report.audits["total-blocking-time"]?.displayValue || "N/A",
 
-      SI:
-        report.audits["speed-index"]
-          ?.displayValue || "N/A",
+      SI: report.audits["speed-index"]?.displayValue || "N/A",
     },
 
     audits: report.audits,

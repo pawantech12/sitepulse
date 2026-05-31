@@ -2,29 +2,41 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 
 export async function crawlWebsite(baseUrl) {
-  const visited = new Set();
-
   try {
-    const { data } = await axios.get(baseUrl);
+    const normalizedBase = new URL(baseUrl);
+
+    const { data } = await axios.get(baseUrl, {
+      timeout: 20000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 SitePulseBot",
+      },
+    });
 
     const $ = cheerio.load(data);
 
-    $("a").each((_, el) => {
-      let href = $(el).attr("href");
+    const links = new Set();
+
+    $("a").each((_, element) => {
+      const href = $(element).attr("href");
 
       if (!href) return;
 
-      if (href.startsWith("/")) {
-        visited.add(baseUrl + href);
-      }
+      try {
+        const absoluteUrl = new URL(href, baseUrl);
 
-      if (href.startsWith(baseUrl)) {
-        visited.add(href);
-      }
+        if (
+          absoluteUrl.hostname === normalizedBase.hostname &&
+          !absoluteUrl.href.includes("#")
+        ) {
+          links.add(absoluteUrl.href.replace(/\/$/, ""));
+        }
+      } catch {}
     });
 
-    return Array.from(visited).slice(0, 15);
-  } catch (err) {
+    return [...links].slice(0, 15);
+  } catch (error) {
+    console.log("Crawler Error:", error.message);
+
     return [];
   }
 }

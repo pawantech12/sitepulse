@@ -10,6 +10,11 @@ const ScanSchema = new mongoose.Schema(
 
     scanDuration: String,
 
+    status: {
+      type: String,
+      default: "completed",
+    },
+
     pages: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -29,5 +34,4 @@ const ScanSchema = new mongoose.Schema(
   },
 );
 
-export default mongoose.models.Scan ||
-  mongoose.model("Scan", ScanSchema);
+export default mongoose.models.Scan || mongoose.model("Scan", ScanSchema);

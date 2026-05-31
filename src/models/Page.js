@@ -20,11 +20,12 @@ const PageSchema = new mongoose.Schema(
     metrics: Object,
 
     issues: Object,
+
+    rawAudits: Object,
   },
   {
     timestamps: true,
   },
 );
 
-export default mongoose.models.Page ||
-  mongoose.model("Page", PageSchema);
+export default mongoose.models.Page || mongoose.model("Page", PageSchema);

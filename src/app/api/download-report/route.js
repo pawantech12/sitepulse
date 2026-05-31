@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import puppeteer from "puppeteer";
+import puppeteer from "puppeteer-core";
+import chromium from "@sparticuz/chromium";
 
 import MarkdownIt from "markdown-it";
 
@@ -362,12 +363,24 @@ export async function POST(req) {
       </html>
     `;
 
-    const browser = await puppeteer.launch({
-      headless: "new",
+    let browser;
 
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
+    if (process.env.VERCEL) {
+      browser = await puppeteer.launch({
+        args: chromium.args,
 
+        executablePath: await chromium.executablePath(),
+
+        headless: true,
+      });
+    } else {
+      browser = await puppeteer.launch({
+        executablePath:
+          "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+
+        headless: true,
+      });
+    }
     const page = await browser.newPage();
 
     await page.setContent(html, {
