@@ -285,29 +285,76 @@ export default function ReportPage() {
 
   if (error || !scan) {
     return (
-      <section className="flex min-h-screen items-center justify-center bg-[#fafafa] px-4">
-        <div className="max-w-md rounded-3xl border border-red-100 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50">
-            <AlertTriangle className="h-7 w-7 text-red-500" />
+      <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#fafafa] px-4 py-20">
+        {/* Background */}
+        <div className="absolute inset-0 -z-10 overflow-hidden">
+          <div className="absolute left-1/2 top-0 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-red-500/[0.06] blur-3xl" />
+
+          <div className="absolute bottom-0 right-0 h-[280px] w-[280px] rounded-full bg-orange-400/[0.05] blur-3xl" />
+        </div>
+
+        <div className="w-full max-w-xl">
+          <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_20px_80px_rgba(15,23,42,0.08)]">
+            {/* Top Accent */}
+            <div className="h-1 w-full bg-gradient-to-r from-red-500 via-orange-500 to-amber-400" />
+
+            <div className="p-8 sm:p-10">
+              {/* Icon */}
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-red-100 bg-red-50">
+                <AlertTriangle className="h-9 w-9 text-red-500" />
+              </div>
+
+              {/* Content */}
+              <div className="mt-8 text-center">
+                <div className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 py-2 text-xs font-semibold text-red-600">
+                  Error Loading Report
+                </div>
+
+                <h1 className="mt-5 text-3xl font-bold tracking-tight text-slate-900">
+                  Report Not Available
+                </h1>
+
+                <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-slate-600 sm:text-base">
+                  We couldn&apos;t load this scan report. The report may have
+                  been deleted, expired, or the provided scan ID is invalid.
+                </p>
+
+                {error && (
+                  <div className="mt-6 rounded-2xl border border-red-100 bg-red-50/70 p-4">
+                    <p className="text-sm text-red-600">{error}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <Link
+                  href="/analyze"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-6 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-slate-800"
+                >
+                  Analyze New Website
+                </Link>
+
+                <button
+                  onClick={() => window.location.reload()}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 transition-all duration-300 hover:border-slate-300 hover:bg-slate-50"
+                >
+                  Try Again
+                </button>
+              </div>
+
+              {/* Footer */}
+              <div className="mt-8 border-t border-slate-100 pt-6 text-center">
+                <p className="text-xs text-slate-400">
+                  SitePulse • Website Performance Intelligence Platform
+                </p>
+              </div>
+            </div>
           </div>
-
-          <h2 className="mt-5 text-2xl font-bold text-slate-900">
-            Failed To Load Report
-          </h2>
-
-          <p className="mt-3 text-sm leading-7 text-slate-600">{error}</p>
-
-          <Link
-            href="/analyze"
-            className="mt-6 inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-5 text-sm font-semibold text-white"
-          >
-            Go Back
-          </Link>
         </div>
       </section>
     );
   }
-
   return (
     <section className="min-h-screen bg-[#fafafa] pt-28">
       <div className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
