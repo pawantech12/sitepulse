@@ -69,5 +69,12 @@ function formatReport(report) {
     },
 
     audits: report.audits,
+    // Add this:
+    categories: {
+      performance: report.categories.performance?.auditRefs || [],
+      seo: report.categories.seo?.auditRefs || [],
+      accessibility: report.categories.accessibility?.auditRefs || [],
+      practices: report.categories["best-practices"]?.auditRefs || [],
+    },
   };
 }

@@ -6,6 +6,7 @@ import { updateLog } from "@/lib/updateLog";
 
 import Scan from "@/models/Scan";
 import Page from "@/models/Page";
+import { enrichIssuesWithAI } from "./enrichIssuesWithAI";
 
 function formatDuration(ms) {
   const totalSeconds = Math.floor(ms / 1000);
@@ -21,25 +22,41 @@ export async function processScan(scanId, url) {
   try {
     const startTime = Date.now();
 
-    const crawlerLog = await createLog(
+    const connectingLog = await createLog(
       scanId,
-      "Initializing crawler",
+      "Connecting to website",
       "running",
     );
 
     let pages = await crawlWebsite(url);
 
-    if (crawlerLog?._id) {
-      await updateLog(crawlerLog._id, "success");
+    if (connectingLog?._id) {
+      await updateLog(connectingLog._id, "success");
     }
 
-    await createLog(scanId, `${pages.length} pages discovered`, "success");
+    const extractionLog = await createLog(
+      scanId,
+      "Extracting internal links",
+      "running",
+    );
 
     if (!pages.length) {
       pages = [url];
     }
 
     pages = [...new Set(pages)];
+
+    if (extractionLog?._id) {
+      await updateLog(extractionLog._id, "success");
+    }
+
+    await createLog(scanId, `${pages.length} pages discovered`, "success");
+
+    await Scan.findByIdAndUpdate(scanId, {
+      discoveredPages: pages,
+      totalPages: pages.length,
+      stage: "discovery_completed",
+    });
 
     const createdPages = [];
 
@@ -58,6 +75,11 @@ export async function processScan(scanId, url) {
     );
 
     for (const pageUrl of pages) {
+      await Scan.findByIdAndUpdate(scanId, {
+        currentPage: pageUrl,
+        stage: "lighthouse_running",
+      });
+
       let log = null;
 
       try {
@@ -72,18 +94,33 @@ export async function processScan(scanId, url) {
 
         const result = await runLighthouse(pageUrl);
 
+        // First, format issues using Lighthouse's actual categories.
+        const formattedIssues = formatIssues(result.audits, result.categories);
+
+        // Then generate AI explanations and fixes for every issue.
+        const enrichedIssues = await enrichIssuesWithAI(
+          formattedIssues,
+          pageUrl,
+        );
+
+        // Save both the AI-enriched issues and original Lighthouse data.
         const page = await Page.create({
+          scanId,
           url: pageUrl,
           performance: result.performance,
           seo: result.seo,
           accessibility: result.accessibility,
           bestPractices: result.bestPractices,
           metrics: result.metrics,
-          issues: formatIssues(result.audits),
+          issues: enrichedIssues,
           rawAudits: result.audits,
         });
 
         createdPages.push(page);
+
+        await Scan.findByIdAndUpdate(scanId, {
+          $inc: { completedPages: 1 },
+        });
 
         performance += result.performance;
         seo += result.seo;
@@ -95,6 +132,11 @@ export async function processScan(scanId, url) {
         }
       } catch (error) {
         console.error(error);
+
+        await Scan.findByIdAndUpdate(scanId, {
+          $inc: { failedPages: 1 },
+        });
+
         if (log?._id) {
           await updateLog(log._id, "error");
         }
@@ -112,6 +154,15 @@ export async function processScan(scanId, url) {
     scan.status = totalPages > 0 ? "completed" : "failed";
 
     scan.totalPages = totalPages;
+
+    scan.stage = totalPages > 0 ? "completed" : "failed";
+    scan.currentPage = "";
+
+    const reportLog = await createLog(
+      scanId,
+      "Generating final report",
+      "running",
+    );
 
     scan.overallScore =
       totalPages > 0
@@ -136,6 +187,10 @@ export async function processScan(scanId, url) {
     scan.scanDuration = formatDuration(Date.now() - startTime);
 
     await scan.save();
+
+    if (reportLog?._id) {
+      await updateLog(reportLog._id, "success");
+    }
 
     await createLog(scanId, "Lighthouse analysis completed", "success");
   } catch (error) {

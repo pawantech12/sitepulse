@@ -4,35 +4,30 @@ import puppeteer from "puppeteer-core";
 import chromium from "@sparticuz/chromium";
 
 import MarkdownIt from "markdown-it";
-
 import hljs from "highlight.js";
 
 const md = new MarkdownIt({
   html: true,
-
   linkify: true,
-
   breaks: true,
 
-  highlight: function (str, lang) {
+  highlight(str, lang) {
     if (lang && hljs.getLanguage(lang)) {
       try {
+        const highlighted = hljs.highlight(str, {
+          language: lang,
+        }).value;
+
         return `
-          <pre class="hljs">
-            <code>
-              ${
-                hljs.highlight(str, {
-                  language: lang,
-                }).value
-              }
-            </code>
+          <pre class="code-block">
+            <code>${highlighted}</code>
           </pre>
         `;
       } catch (_) {}
     }
 
     return `
-      <pre class="hljs">
+      <pre class="code-block">
         <code>${md.utils.escapeHtml(str)}</code>
       </pre>
     `;
@@ -40,330 +35,484 @@ const md = new MarkdownIt({
 });
 
 export async function POST(req) {
+  let browser;
+
   try {
     const body = await req.json();
 
     const markdown = body.content || "";
 
+    if (!markdown.trim()) {
+      return NextResponse.json(
+        {
+          error: "Report content is empty",
+        },
+        {
+          status: 400,
+        },
+      );
+    }
+
     const htmlContent = md.render(markdown);
+
+    const generatedAt = new Date().toLocaleString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
     const html = `
       <!DOCTYPE html>
+
       <html>
-      <head>
-        <meta charset="UTF-8" />
+        <head>
+          <meta charset="UTF-8" />
 
-        <style>
-  * {
-    box-sizing: border-box;
-  }
+          <style>
 
-  body {
-    font-family:
-      Inter,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      sans-serif;
+            /* =========================================================
+               BASE
+            ========================================================= */
 
-    padding: 48px;
-    color: #0f172a;
-    background: #ffffff;
-    line-height: 1.8;
-    font-size: 15px;
-    -webkit-font-smoothing: antialiased;
-  }
+            * {
+              box-sizing: border-box;
+            }
 
-  /* HEADER */
+            html {
+              font-size: 10px;
+            }
 
-  .header {
-    margin-bottom: 48px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid #e2e8f0;
-  }
+            body {
+              margin: 0;
+              padding: 0;
 
-  .title {
-    font-size: 38px;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    line-height: 1.2;
+              font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
 
-    background: linear-gradient(
-      90deg,
-      #0f766e,
-      #4338ca
-    );
+              color: #1e293b;
+              background: #ffffff;
 
-    -webkit-background-clip: text;
+              font-size: 10.5pt;
+              line-height: 1.55;
 
-    -webkit-text-fill-color: transparent;
-  }
+              -webkit-font-smoothing: antialiased;
+              print-color-adjust: exact;
+              -webkit-print-color-adjust: exact;
+            }
 
-  .subtitle {
-    margin-top: 10px;
-    color: #64748b;
-    font-size: 14px;
-  }
+            /* =========================================================
+               REPORT HEADER
+            ========================================================= */
 
-  /* HEADINGS */
+            .report-header {
+              padding-bottom: 18px;
+              margin-bottom: 24px;
 
-  h1,
-  h2,
-  h3,
-  h4 {
-    color: #0f172a;
-    letter-spacing: -0.03em;
-    font-weight: 700;
-    line-height: 1.3;
-  }
+              border-bottom: 1px solid #dbe2ea;
+            }
 
-  h1 {
-    font-size: 34px;
-    margin-top: 50px;
-    margin-bottom: 20px;
-    font-weight: 800;
-  }
+            .report-kicker {
+              margin-bottom: 5px;
 
-  h2 {
-    font-size: 28px;
-    margin-top: 44px;
-    margin-bottom: 18px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #e2e8f0;
-    position: relative;
-  }
+              color: #64748b;
 
-  h2::before {
-    content: "";
-    position: absolute;
-    left: -20px;
-    top: 4px;
-    width: 5px;
-    height: 32px;
-    border-radius: 999px;
-    background: linear-gradient(
-      to bottom,
-      #06b6d4,
-      #4f46e5
-    );
-  }
+              font-size: 8.5pt;
+              font-weight: 700;
 
-  h3 {
-    font-size: 22px;
-    margin-top: 34px;
-    margin-bottom: 12px;
-  }
+              letter-spacing: 0.08em;
+              text-transform: uppercase;
+            }
 
-  h4 {
-    font-size: 18px;
-    margin-top: 26px;
-    margin-bottom: 10px;
-  }
+            .report-title {
+              margin: 0;
 
-  /* TEXT */
+              color: #0f172a;
 
-  p {
-    margin: 16px 0;
-    color: #334155;
-    font-size: 15px;
-    line-height: 1.9;
-  }
+              font-size: 23pt;
+              font-weight: 750;
 
-  strong {
-    color: #0f172a;
-    font-weight: 700;
-  }
+              line-height: 1.15;
+              letter-spacing: -0.02em;
+            }
 
-  a {
-    color: #0891b2;
-    text-decoration: none;
-    font-weight: 500;
-  }
+            .report-meta {
+              margin-top: 7px;
 
-  /* LISTS */
+              color: #64748b;
 
-  ul,
-  ol {
-    margin: 20px 0;
-    padding-left: 26px;
-  }
+              font-size: 8.5pt;
+              line-height: 1.4;
+            }
 
-  ul {
-    list-style-type: disc;
-  }
+            /* =========================================================
+               TYPOGRAPHY
+            ========================================================= */
 
-  ol {
-    list-style-type: decimal;
-  }
+            h1,
+            h2,
+            h3,
+            h4 {
+              color: #0f172a;
 
-  li {
-    margin: 10px 0;
-    color: #334155;
-    padding-left: 4px;
-    line-height: 1.8;
-  }
+              font-weight: 700;
 
-  li::marker {
-    color: #64748b;
-    font-weight: 600;
-  }
+              line-height: 1.3;
 
-  /* INLINE CODE */
+              page-break-after: avoid;
+              break-after: avoid-page;
+            }
 
-  p code,
-  li code,
-  td code {
-    background: #ecfeff;
-    color: #0e7490;
-    padding: 3px 7px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family:
-      "Fira Code",
-      monospace;
-  }
+            h1 {
+              margin: 28px 0 12px;
 
-  /* CODE BLOCKS */
+              font-size: 20pt;
+              letter-spacing: -0.015em;
+            }
 
-  pre {
-    background: #0f172a;
-    border: 1px solid #1e293b;
-    border-radius: 22px;
-    overflow: hidden;
-    margin: 28px 0;
-    page-break-inside: avoid;
-  }
+            h2 {
+              margin: 25px 0 10px;
 
-  pre code {
-    display: block;
-    padding: 22px 24px;
-    margin: 0;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-word;
+              padding-bottom: 6px;
 
-    font-family:
-      "Fira Code",
-      monospace;
+              font-size: 15pt;
 
-    font-size: 13px;
-    line-height: 1.75;
-    color: #e2e8f0;
-    background: transparent;
-  }
+              border-bottom: 1px solid #dbe2ea;
+            }
 
-  .hljs {
-    background: transparent !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
+            h3 {
+              margin: 18px 0 7px;
 
-  /* BLOCKQUOTE */
+              font-size: 12.5pt;
+            }
 
-  blockquote {
-    margin: 26px 0;
-    padding: 18px 22px;
-    border-left: 4px solid #06b6d4;
-    background: rgba(236, 254, 255, 0.8);
-    border-radius: 0 18px 18px 0;
-    color: #334155;
-  }
+            h4 {
+              margin: 14px 0 6px;
 
-  blockquote p {
-    margin: 0;
-  }
+              font-size: 10.5pt;
+            }
 
-  /* TABLE */
+            p {
+              margin: 7px 0;
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 28px;
-    overflow: hidden;
-    border-radius: 18px;
-    border: 1px solid #e2e8f0;
-  }
+              color: #334155;
 
-  thead {
-    background: #f8fafc;
-  }
+              font-size: 10.5pt;
+              line-height: 1.58;
+            }
 
-  th {
-    color: #0f172a;
-    font-size: 14px;
-    font-weight: 700;
-    text-align: left;
-    padding: 14px 16px;
-    border: 1px solid #e2e8f0;
-  }
+            strong {
+              color: #172033;
+              font-weight: 700;
+            }
 
-  td {
-    color: #334155;
-    padding: 14px 16px;
-    border: 1px solid #e2e8f0;
-    vertical-align: top;
-  }
+            em {
+              color: #475569;
+            }
 
-  tr:nth-child(even) {
-    background: #fcfcfd;
-  }
+            /* =========================================================
+               LINKS
+            ========================================================= */
 
-  /* HR */
+            a {
+              color: #0369a1;
+              text-decoration: none;
+            }
 
-  hr {
-    border: none;
-    border-top: 1px solid #e2e8f0;
-    margin: 42px 0;
-  }
+            /* =========================================================
+               LISTS
+            ========================================================= */
 
-  /* IMAGES */
+            ul,
+            ol {
+              margin: 8px 0 10px;
 
-  img {
-    width: 100%;
-    border-radius: 24px;
-    border: 1px solid #e2e8f0;
-    margin-top: 24px;
-  }
+              padding-left: 21px;
+            }
 
-  /* PAGE BREAKS */
+            li {
+              margin: 3px 0;
 
-  h1,
-  h2,
-  h3,
-  h4,
-  pre,
-  table,
-  blockquote {
-    page-break-inside: avoid;
-  }
+              padding-left: 3px;
 
-  /* SCROLL FIX */
+              color: #334155;
 
-  pre,
-  table {
-    overflow-wrap: anywhere;
-  }
-</style>
-      </head>
+              font-size: 10.25pt;
+              line-height: 1.5;
+            }
 
-      <body>
-        <div class="header">
-          <div class="title">
-            AI Optimization Report
-          </div>
+            li::marker {
+              color: #64748b;
+            }
 
-          <div class="subtitle">
-            Generated on ${new Date().toLocaleString()}
-          </div>
-        </div>
+            /* =========================================================
+               INLINE CODE
+            ========================================================= */
 
-        ${htmlContent}
-      </body>
+            code {
+              font-family:
+                "SFMono-Regular",
+                Consolas,
+                "Liberation Mono",
+                monospace;
+            }
+
+            p code,
+            li code,
+            td code,
+            th code {
+              padding: 1px 4px;
+
+              color: #075985;
+              background: #f0f9ff;
+
+              border: 1px solid #e0f2fe;
+              border-radius: 3px;
+
+              font-size: 8.5pt;
+            }
+
+            /* =========================================================
+               CODE BLOCKS
+            ========================================================= */
+
+            pre.code-block {
+              margin: 10px 0 13px;
+
+              padding: 11px 13px;
+
+              color: #e2e8f0;
+              background: #0f172a;
+
+              border: 1px solid #1e293b;
+              border-radius: 5px;
+
+              overflow: hidden;
+
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+
+            pre.code-block code {
+              display: block;
+
+              padding: 0;
+
+              color: #e2e8f0;
+              background: transparent;
+
+              font-family:
+                "SFMono-Regular",
+                Consolas,
+                "Liberation Mono",
+                monospace;
+
+              font-size: 8.25pt;
+              line-height: 1.5;
+
+              white-space: pre-wrap;
+              overflow-wrap: anywhere;
+              word-break: break-word;
+            }
+
+            /* =========================================================
+               BLOCKQUOTE
+            ========================================================= */
+
+            blockquote {
+              margin: 12px 0;
+
+              padding: 9px 13px;
+
+              color: #475569;
+
+              background: #f8fafc;
+
+              border-left: 3px solid #94a3b8;
+            }
+
+            blockquote p {
+              margin: 0;
+
+              color: #475569;
+
+              font-size: 9.75pt;
+            }
+
+            /* =========================================================
+               TABLES
+            ========================================================= */
+
+            table {
+              width: 100%;
+
+              margin: 12px 0 16px;
+
+              border-collapse: collapse;
+
+              border: 1px solid #cbd5e1;
+
+              font-size: 9pt;
+
+              page-break-inside: auto;
+              break-inside: auto;
+            }
+
+            thead {
+              display: table-header-group;
+            }
+
+            th {
+              padding: 7px 8px;
+
+              color: #1e293b;
+
+              background: #f1f5f9;
+
+              border: 1px solid #cbd5e1;
+
+              font-size: 8.75pt;
+              font-weight: 700;
+
+              text-align: left;
+              vertical-align: top;
+            }
+
+            td {
+              padding: 7px 8px;
+
+              color: #334155;
+
+              border: 1px solid #cbd5e1;
+
+              font-size: 8.75pt;
+
+              line-height: 1.45;
+
+              vertical-align: top;
+            }
+
+            tr {
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+
+            tr:nth-child(even) td {
+              background: #fafbfc;
+            }
+
+            /* =========================================================
+               HORIZONTAL RULE
+            ========================================================= */
+
+            hr {
+              height: 1px;
+
+              margin: 20px 0;
+
+              border: 0;
+
+              background: #dbe2ea;
+            }
+
+            /* =========================================================
+               IMAGES
+            ========================================================= */
+
+            img {
+              display: block;
+
+              max-width: 100%;
+              height: auto;
+
+              margin: 12px auto;
+
+              border: 1px solid #dbe2ea;
+              border-radius: 5px;
+
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+
+            /* =========================================================
+               PAGE BREAK CONTROL
+            ========================================================= */
+
+            h1,
+            h2,
+            h3,
+            h4 {
+              break-after: avoid-page;
+            }
+
+            p,
+            ul,
+            ol,
+            blockquote {
+              orphans: 3;
+              widows: 3;
+            }
+
+            /* Prevent tiny orphaned sections */
+            h2 + p,
+            h2 + ul,
+            h2 + ol,
+            h2 + table,
+            h3 + p,
+            h3 + ul,
+            h3 + ol {
+              break-before: avoid-page;
+            }
+
+            /* =========================================================
+               FOOTER
+            ========================================================= */
+
+            @page {
+              size: A4;
+
+              margin:
+                18mm
+                16mm
+                18mm
+                16mm;
+            }
+
+          </style>
+        </head>
+
+        <body>
+
+          <header class="report-header">
+
+            <div class="report-kicker">
+              SitePulse · Technical Audit
+            </div>
+
+            <h1 class="report-title">
+              AI Optimization Report
+            </h1>
+
+            <div class="report-meta">
+              Generated ${generatedAt}
+            </div>
+
+          </header>
+
+          <main>
+            ${htmlContent}
+          </main>
+
+        </body>
       </html>
     `;
 
-    let browser;
+    /* =========================================================
+       LAUNCH BROWSER
+    ========================================================= */
 
     if (process.env.VERCEL) {
       browser = await puppeteer.launch({
@@ -379,38 +528,96 @@ export async function POST(req) {
           "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
 
         headless: true,
+
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
       });
     }
+
     const page = await browser.newPage();
+
+    await page.setViewport({
+      width: 1240,
+      height: 1754,
+      deviceScaleFactor: 1,
+    });
 
     await page.setContent(html, {
       waitUntil: "networkidle0",
     });
+
+    /* =========================================================
+       PDF
+    ========================================================= */
 
     const pdfBuffer = await page.pdf({
       format: "A4",
 
       printBackground: true,
 
+      preferCSSPageSize: true,
+
+      displayHeaderFooter: true,
+
+      headerTemplate: `
+        <div></div>
+      `,
+
+      footerTemplate: `
+        <div
+          style="
+            width: 100%;
+            padding: 0 16mm;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 7.5px;
+            color: #94a3b8;
+          "
+        >
+          <span>
+            SitePulse · AI Optimization Report
+          </span>
+
+          <span>
+            Page
+            <span class="pageNumber"></span>
+            of
+            <span class="totalPages"></span>
+          </span>
+        </div>
+      `,
+
       margin: {
-        top: "20px",
-        right: "20px",
-        bottom: "20px",
-        left: "20px",
+        top: "18mm",
+        right: "16mm",
+        bottom: "18mm",
+        left: "16mm",
       },
     });
 
     await browser.close();
+    browser = null;
 
     return new NextResponse(pdfBuffer, {
       headers: {
         "Content-Type": "application/pdf",
 
         "Content-Disposition": 'attachment; filename="ai-report.pdf"',
+
+        "Content-Length": String(pdfBuffer.length),
       },
     });
   } catch (error) {
-    console.log(error);
+    console.error("PDF generation error:", error);
+
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (_) {}
+    }
 
     return NextResponse.json(
       {
