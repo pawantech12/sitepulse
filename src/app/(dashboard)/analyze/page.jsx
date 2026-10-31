@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import Link from "next/link";
 import {
@@ -22,7 +22,7 @@ import { Clock } from "lucide-react";
 import { LoaderCircle } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 
-export default function AnalyzePage() {
+function AnalyzePageContent() {
   const [url, setUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [scanId, setScanId] = useState(null);
@@ -1614,5 +1614,26 @@ export default function AnalyzePage() {
         )}
       </div>
     </section>
+  );
+}
+
+export default function AnalyzePage() {
+  return (
+    <Suspense
+      fallback={
+        <section className="min-h-screen w-full bg-[#f7f8fa] pt-[104px] text-[#0b1020]">
+          <div className="mx-auto w-full max-w-[1220px] px-5 sm:px-6 lg:px-0">
+            <div className="flex items-center gap-3">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-[#DDE1EA] border-t-[#2B6AFF]" />
+              <p className="text-sm text-[#596273]">
+                Loading website analysis...
+              </p>
+            </div>
+          </div>
+        </section>
+      }
+    >
+      <AnalyzePageContent />
+    </Suspense>
   );
 }
