@@ -20,7 +20,7 @@ import { List } from "lucide-react";
 import { RefreshCw } from "lucide-react";
 import { Clock } from "lucide-react";
 import { LoaderCircle } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 function AnalyzePageContent() {
   const [url, setUrl] = useState("");
@@ -34,12 +34,33 @@ function AnalyzePageContent() {
   const [completed, setCompleted] = useState(false);
   const [liveLogs, setLiveLogs] = useState([]);
   const [isStartingScan, setIsStartingScan] = useState(false);
+  const router = useRouter();
 
   const [scanData, setScanData] = useState(null);
 
   const searchParams = useSearchParams();
   const initialUrl = searchParams.get("url");
   const hasAutoStartedRef = useRef(false);
+
+  useEffect(() => {
+    const checkUserLoggedIn = async () => {
+      try {
+        const response = await axios.get("/api/auth/me", {});
+
+        if (!response.data?.success || !response.data?.user) {
+          router.replace("/login");
+          return;
+        }
+      } catch (err) {
+        if (err.response?.status === 401) {
+          router.replace("/login");
+          return;
+        }
+      }
+    };
+
+    checkUserLoggedIn();
+  }, []);
 
   useEffect(() => {
     if (!initialUrl || hasAutoStartedRef.current) return;
